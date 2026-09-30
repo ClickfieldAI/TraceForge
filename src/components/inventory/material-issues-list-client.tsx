@@ -6,6 +6,8 @@ import { Plus, ChevronRight, Download, Search, ArrowRightLeft } from "lucide-rea
 import { buttonVariants, Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { formatQty } from "@/lib/format"
 
@@ -15,7 +17,8 @@ type IssueItem = {
   returned_qty: number
   uom: string
   remarks: string | null
-  item_master: { item_code: string; item_name: string; consumable_type: string | null } | null
+  item_master: { id: string; item_code: string; item_name: string; consumable_type: string | null } | null
+  storage_locations: { id: string; code: string } | null
 }
 
 export type IssueRow = {
@@ -32,6 +35,8 @@ export type IssueRow = {
 }
 
 type TypeFilter = "all" | "wire" | "rod" | "powder"
+type Location = { id: string; code: string; name: string }
+type Item = { id: string; item_code: string; item_name: string; consumable_type: string | null }
 
 /** "E7018 Electrode" or "E7018 Electrode +2 more" — the materials on an issue. */
 function materialSummary(items: IssueItem[]): string {
@@ -46,33 +51,42 @@ function csvEscape(v: string | number | null | undefined): string {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
+/** Same criteria the on-screen list uses to decide whether a line "counts" for the active filters. */
+function matchesLine(it: IssueItem, typeFilter: TypeFilter, locationFilter: string, itemFilter: string): boolean {
+  if (typeFilter !== "all" && it.item_master?.consumable_type !== typeFilter) return false
+  if (locationFilter !== "all" && it.storage_locations?.id !== locationFilter) return false
+  if (itemFilter !== "all" && it.item_master?.id !== itemFilter) return false
+  return true
+}
+
 /**
- * Exports one CSV row per matching item LINE, not per issue. With a type
- * filter active, an issue that mixes (say) wire and rod lines must export
- * only its wire lines — otherwise "export while filtered to Wire" would still
- * drag in that issue's unrelated rod lines, which is the exact bug reported.
+ * Exports one CSV row per matching item LINE, not per issue. With filters
+ * active, an issue that mixes (say) wire and rod lines must export only its
+ * matching lines — otherwise "export while filtered to Wire" would still
+ * drag in that issue's unrelated rod lines, which is the exact bug this
+ * fixed originally; the same logic now also applies to Location/Description.
  */
-function exportCsv(records: IssueRow[], typeFilter: TypeFilter) {
+function exportCsv(records: IssueRow[], typeFilter: TypeFilter, locationFilter: string, itemFilter: string) {
   const header = [
     "Issue No", "Date", "Job Card", "Issued To", "Destination", "Status", "Usage", "Issue Remarks",
-    "Item Code", "Item Name", "Type", "Issued Qty", "Consumed Qty", "Returned Qty", "UOM", "Item Remarks",
+    "Item Code", "Item Name", "Type", "Location", "Issued Qty", "Consumed Qty", "Returned Qty", "UOM", "Item Remarks",
   ]
   const rows: string[] = [header.join(",")]
+  const noFiltersActive = typeFilter === "all" && locationFilter === "all" && itemFilter === "all"
   for (const r of records) {
     const date = new Date(r.issue_date).toLocaleDateString("en-IN")
     const base = [r.issue_number, date, r.job_cards?.jc_number ?? "", r.issued_to ?? "", r.destination ?? "", r.status, r.consumption_status, r.remarks ?? ""]
-    const lines = typeFilter === "all"
-      ? r.material_issue_items
-      : r.material_issue_items.filter((it) => it.item_master?.consumable_type === typeFilter)
+    const lines = r.material_issue_items.filter((it) => matchesLine(it, typeFilter, locationFilter, itemFilter))
 
     if (lines.length === 0) {
-      if (typeFilter === "all") rows.push([...base, "", "", "", "", "", "", ""].map(csvEscape).join(","))
+      if (noFiltersActive) rows.push([...base, "", "", "", "", "", "", "", ""].map(csvEscape).join(","))
       continue
     }
     for (const it of lines) {
       rows.push([
         ...base,
         it.item_master?.item_code ?? "", it.item_master?.item_name ?? "", it.item_master?.consumable_type ?? "",
+        it.storage_locations?.code ?? "",
         it.issued_qty, it.consumed_qty ?? "", it.returned_qty, it.uom, it.remarks ?? "",
       ].map(csvEscape).join(","))
     }
@@ -90,19 +104,50 @@ function exportCsv(records: IssueRow[], typeFilter: TypeFilter) {
 export function MaterialIssuesListClient({
   records,
   canCreate,
+  locations,
+  items,
 }: {
   records: IssueRow[]
   canCreate: boolean
+  locations: Location[]
+  items: Item[]
 }) {
   const [search, setSearch] = useState("")
+  const [fromDate, setFromDate] = useState("")
+  const [toDate, setToDate] = useState("")
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all")
+  const [locationFilter, setLocationFilter] = useState("all")
+  const [itemFilter, setItemFilter] = useState("all")
+
+  const scopedItems = useMemo(
+    () => (typeFilter === "all" ? items : items.filter((i) => i.consumable_type === typeFilter)),
+    [items, typeFilter]
+  )
+
+  function onTypeChange(value: string) {
+    const next = value as TypeFilter
+    setTypeFilter(next)
+    if (itemFilter !== "all" && !items.some((i) => i.id === itemFilter && (next === "all" || i.consumable_type === next))) {
+      setItemFilter("all")
+    }
+  }
+
+  function reset() {
+    setSearch("")
+    setFromDate("")
+    setToDate("")
+    setTypeFilter("all")
+    setLocationFilter("all")
+    setItemFilter("all")
+  }
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
     return records.filter((r) => {
-      const matchType = typeFilter === "all" ||
-        r.material_issue_items.some((it) => it.item_master?.consumable_type === typeFilter)
-      if (!matchType) return false
+      if (fromDate && r.issue_date < fromDate) return false
+      if (toDate && r.issue_date > toDate) return false
+      const hasMatchingLine = r.material_issue_items.some((it) => matchesLine(it, typeFilter, locationFilter, itemFilter))
+      if (!hasMatchingLine) return false
       if (!q) return true
       return (
         r.issue_number.toLowerCase().includes(q) ||
@@ -114,7 +159,7 @@ export function MaterialIssuesListClient({
           (it.item_master?.item_code ?? "").toLowerCase().includes(q))
       )
     })
-  }, [records, search, typeFilter])
+  }, [records, search, fromDate, toDate, typeFilter, locationFilter, itemFilter])
 
   return (
     <div className="space-y-4">
@@ -127,7 +172,7 @@ export function MaterialIssuesListClient({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => exportCsv(filtered, typeFilter)}
+            onClick={() => exportCsv(filtered, typeFilter, locationFilter, itemFilter)}
             disabled={filtered.length === 0}
           >
             <Download className="mr-1.5 h-4 w-4" /> Export CSV
@@ -140,28 +185,43 @@ export function MaterialIssuesListClient({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex gap-1.5">
-          {([
-            { key: "all", label: "All" },
-            { key: "wire", label: "Wire" },
-            { key: "rod", label: "Rod" },
-            { key: "powder", label: "Powder" },
-          ] as const).map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setTypeFilter(f.key)}
-              className={cn(
-                "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-                typeFilter === f.key
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
+      <div className="flex flex-wrap items-end gap-3">
+        <div>
+          <Label className="text-xs">From</Label>
+          <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="mt-1" />
         </div>
+        <div>
+          <Label className="text-xs">To</Label>
+          <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="mt-1" />
+        </div>
+        <div>
+          <Label className="text-xs">Material Type</Label>
+          <Select value={typeFilter} onChange={(e) => onTypeChange(e.target.value)} className="mt-1">
+            <option value="all">All types</option>
+            <option value="wire">Wire</option>
+            <option value="rod">Rod</option>
+            <option value="powder">Powder</option>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs">Location</Label>
+          <Select value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} className="mt-1">
+            <option value="all">All locations</option>
+            {locations.map((l) => (
+              <option key={l.id} value={l.id}>{l.code} — {l.name}</option>
+            ))}
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs">Description</Label>
+          <Select value={itemFilter} onChange={(e) => setItemFilter(e.target.value)} className="mt-1">
+            <option value="all">All materials</option>
+            {scopedItems.map((i) => (
+              <option key={i.id} value={i.id}>{i.item_code} — {i.item_name}</option>
+            ))}
+          </Select>
+        </div>
+        <Button size="sm" variant="outline" onClick={reset}>Reset</Button>
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search issue, material, job card, operator…" className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />

@@ -1,6 +1,7 @@
 import { requireAuth } from "@/lib/auth"
 import { must } from "@/lib/db"
 import { formatInr, formatQty } from "@/lib/format"
+import { resolveLedgerRowDetails } from "@/lib/inventory/material-report-details"
 import { MaterialReportFilters } from "@/components/inventory/material-report-filters"
 import { MaterialReportExportCsv } from "@/components/inventory/material-report-export-csv"
 import { PrintButton } from "@/components/job-cards/print-button"
@@ -13,8 +14,9 @@ type LedgerRow = {
   qty: number
   unit_rate: number
   reference_type: string
+  reference_id: string
   created_at: string
-  item_master: { item_code: string; item_name: string; uom: string; consumable_type: string | null } | null
+  item_master: { id: string; item_code: string; item_name: string; uom: string; consumable_type: string | null } | null
   storage_locations: { id: string; code: string } | null
 }
 
@@ -39,7 +41,7 @@ type ItemSummary = {
 export default async function MaterialReportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; type?: string; location?: string; txn?: string }>
+  searchParams: Promise<{ from?: string; to?: string; type?: string; location?: string; item?: string }>
 }) {
   const { supabase } = await requireAuth()
   const sp = await searchParams
@@ -50,21 +52,23 @@ export default async function MaterialReportPage({
   const to = sp.to || today
   const typeFilter = sp.type || "all"
   const locationFilter = sp.location || "all"
-  const txnFilter = sp.txn || "all"
+  const itemFilter = sp.item || "all"
 
-  const [ledgerRes, locationsRes] = await Promise.all([
+  const [ledgerRes, locationsRes, itemsRes] = await Promise.all([
     supabase
       .from("stock_ledger")
-      .select("id, transaction_type, qty, unit_rate, reference_type, created_at, item_master(item_code, item_name, uom, consumable_type), storage_locations(id, code)")
+      .select("id, transaction_type, qty, unit_rate, reference_type, reference_id, created_at, item_master(id, item_code, item_name, uom, consumable_type), storage_locations(id, code)")
       .gte("created_at", `${from}T00:00:00`)
       .lte("created_at", `${to}T23:59:59.999`)
       .order("created_at", { ascending: true })
       .limit(5000),
     supabase.from("storage_locations").select("id, code, name").eq("is_active", true).order("code"),
+    supabase.from("item_master").select("id, item_code, item_name, consumable_type").eq("is_active", true).order("item_name"),
   ])
 
   const allRows = must(ledgerRes, "material ledger for this period") as unknown as LedgerRow[]
   const locations = must(locationsRes, "storage locations")
+  const items = must(itemsRes, "items")
 
   // Filtering happens once, here, so the summary table, the transaction
   // detail table, the CSV export and the print view (which is just this same
@@ -72,14 +76,16 @@ export default async function MaterialReportPage({
   const rows = allRows.filter((r) => {
     if (typeFilter !== "all" && r.item_master?.consumable_type !== typeFilter) return false
     if (locationFilter !== "all" && r.storage_locations?.id !== locationFilter) return false
-    if (txnFilter !== "all" && r.transaction_type !== txnFilter) return false
+    if (itemFilter !== "all" && r.item_master?.id !== itemFilter) return false
     return true
   })
+
+  const rowDetails = await resolveLedgerRowDetails(supabase, rows)
 
   const activeFilterLabel = [
     typeFilter !== "all" ? `${typeFilter[0].toUpperCase()}${typeFilter.slice(1)}` : null,
     locationFilter !== "all" ? locations.find((l) => l.id === locationFilter)?.code : null,
-    txnFilter !== "all" ? txnFilter.replace(/_/g, " ") : null,
+    itemFilter !== "all" ? items.find((i) => i.id === itemFilter)?.item_name : null,
   ].filter(Boolean).join(" · ")
 
   const summaryByItem = new Map<string, ItemSummary>()
@@ -114,7 +120,7 @@ export default async function MaterialReportPage({
           <p className="mt-1 text-sm text-muted-foreground">Stock movement for a chosen date range, printable.</p>
         </div>
         <div className="flex items-center gap-2">
-          <MaterialReportExportCsv rows={rows} from={from} to={to} typeFilter={typeFilter} />
+          <MaterialReportExportCsv rows={rows} rowDetails={rowDetails} from={from} to={to} typeFilter={typeFilter} />
           <PrintButton label="Print Report" />
         </div>
       </div>
@@ -124,8 +130,9 @@ export default async function MaterialReportPage({
         to={to}
         typeFilter={typeFilter}
         locationFilter={locationFilter}
-        txnFilter={txnFilter}
+        itemFilter={itemFilter}
         locations={locations}
+        items={items}
       />
 
       <header className="hidden border-b-2 border-foreground pb-3 print:block">
@@ -201,6 +208,7 @@ export default async function MaterialReportPage({
                   <th className="px-3 py-1.5 font-medium">Item</th>
                   <th className="px-3 py-1.5 font-medium">Location</th>
                   <th className="px-3 py-1.5 font-medium">Type</th>
+                  <th className="px-3 py-1.5 font-medium">Supplier / Customer</th>
                   <th className="px-3 py-1.5 text-right font-medium">Qty</th>
                   <th className="px-3 py-1.5 text-right font-medium">Rate</th>
                 </tr>
@@ -214,6 +222,7 @@ export default async function MaterialReportPage({
                     <td className="px-3 py-1.5">{r.item_master?.item_code ?? "—"}</td>
                     <td className="px-3 py-1.5 text-muted-foreground">{r.storage_locations?.code ?? "—"}</td>
                     <td className="px-3 py-1.5 capitalize text-muted-foreground">{r.transaction_type.replace(/_/g, " ")}</td>
+                    <td className="px-3 py-1.5 text-muted-foreground">{rowDetails.get(r.id)?.supplierCustomer ?? "—"}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{formatQty(r.qty)} {r.item_master?.uom}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">{formatInr(r.unit_rate)}</td>
                   </tr>

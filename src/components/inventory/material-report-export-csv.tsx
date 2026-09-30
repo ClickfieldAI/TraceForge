@@ -2,6 +2,7 @@
 
 import { Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import type { RowDetail } from "@/lib/inventory/material-report-details"
 
 type LedgerRow = {
   id: string
@@ -23,23 +24,29 @@ function csvEscape(v: string | number | null | undefined): string {
  * Exports exactly the rows the page already filtered server-side (same
  * `rows` prop that drives the on-screen tables) — never re-derives or
  * re-fetches, so this can't drift from what's shown on screen or on print.
+ *
+ * No Rate/Value columns: this sheet goes to people who shouldn't see costing
+ * data, so Remarks (the GRN/issue/adjustment/transfer note behind each row)
+ * takes their place instead.
  */
 export function MaterialReportExportCsv({
   rows,
+  rowDetails,
   from,
   to,
   typeFilter,
 }: {
   rows: LedgerRow[]
+  rowDetails: Map<string, RowDetail>
   from: string
   to: string
   typeFilter: string
 }) {
   function exportCsv() {
-    const header = ["Date", "Item Code", "Item Name", "Type", "Location", "Transaction", "Qty", "UOM", "Rate", "Value"]
+    const header = ["Date", "Item Code", "Item Name", "Type", "Location", "Transaction", "Supplier / Customer", "Qty", "UOM", "Remarks"]
     const lines = [header.join(",")]
     for (const r of rows) {
-      const value = (r.transaction_type.endsWith("_in") ? r.qty : -r.qty) * r.unit_rate
+      const detail = rowDetails.get(r.id)
       lines.push([
         new Date(r.created_at).toLocaleDateString("en-IN"),
         r.item_master?.item_code ?? "",
@@ -47,10 +54,10 @@ export function MaterialReportExportCsv({
         r.item_master?.consumable_type ?? "",
         r.storage_locations?.code ?? "",
         r.transaction_type.replace(/_/g, " "),
+        detail?.supplierCustomer ?? "",
         r.qty,
         r.item_master?.uom ?? "",
-        r.unit_rate,
-        value.toFixed(2),
+        detail?.remarks ?? "",
       ].map(csvEscape).join(","))
     }
     const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" })

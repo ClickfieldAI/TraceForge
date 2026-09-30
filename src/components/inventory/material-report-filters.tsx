@@ -1,19 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 
-const TXN_TYPES = [
-  { value: "all", label: "All transaction types" },
-  { value: "grn_in", label: "GRN In" },
-  { value: "issue_out", label: "Issue Out" },
-  { value: "adjustment_in", label: "Adjustment In" },
-  { value: "adjustment_out", label: "Adjustment Out" },
-]
+type Item = { id: string; item_code: string; item_name: string; consumable_type: string | null }
 
 /**
  * All filters live in the URL (searchParams), not client state — the report
@@ -27,15 +21,17 @@ export function MaterialReportFilters({
   to,
   typeFilter,
   locationFilter,
-  txnFilter,
+  itemFilter,
   locations,
+  items,
 }: {
   from: string
   to: string
   typeFilter: string
   locationFilter: string
-  txnFilter: string
+  itemFilter: string
   locations: { id: string; code: string; name: string }[]
+  items: Item[]
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -44,7 +40,22 @@ export function MaterialReportFilters({
   const [toDate, setToDate] = useState(to)
   const [type, setType] = useState(typeFilter)
   const [location, setLocation] = useState(locationFilter)
-  const [txn, setTxn] = useState(txnFilter)
+  const [item, setItem] = useState(itemFilter)
+
+  // Scoped to the currently chosen Material Type — picking "Powder" narrows
+  // the Description list to just powder items, so a stale selection from a
+  // different type can't silently linger after switching type.
+  const scopedItems = useMemo(
+    () => (type === "all" ? items : items.filter((i) => i.consumable_type === type)),
+    [items, type]
+  )
+
+  function onTypeChange(value: string) {
+    setType(value)
+    if (item !== "all" && !items.some((i) => i.id === item && (value === "all" || i.consumable_type === value))) {
+      setItem("all")
+    }
+  }
 
   function apply() {
     const params = new URLSearchParams(searchParams.toString())
@@ -52,7 +63,7 @@ export function MaterialReportFilters({
     params.set("to", toDate)
     params.set("type", type)
     params.set("location", location)
-    params.set("txn", txn)
+    params.set("item", item)
     router.push(`${pathname}?${params.toString()}`)
   }
 
@@ -61,7 +72,7 @@ export function MaterialReportFilters({
     setToDate(to)
     setType("all")
     setLocation("all")
-    setTxn("all")
+    setItem("all")
     router.push(pathname)
   }
 
@@ -77,7 +88,7 @@ export function MaterialReportFilters({
       </div>
       <div>
         <Label className="text-xs">Material Type</Label>
-        <Select value={type} onChange={(e) => setType(e.target.value)} className="mt-1">
+        <Select value={type} onChange={(e) => onTypeChange(e.target.value)} className="mt-1">
           <option value="all">All types</option>
           <option value="wire">Wire</option>
           <option value="rod">Rod</option>
@@ -94,10 +105,11 @@ export function MaterialReportFilters({
         </Select>
       </div>
       <div>
-        <Label className="text-xs">Transaction</Label>
-        <Select value={txn} onChange={(e) => setTxn(e.target.value)} className="mt-1">
-          {TXN_TYPES.map((t) => (
-            <option key={t.value} value={t.value}>{t.label}</option>
+        <Label className="text-xs">Description</Label>
+        <Select value={item} onChange={(e) => setItem(e.target.value)} className="mt-1">
+          <option value="all">All materials</option>
+          {scopedItems.map((i) => (
+            <option key={i.id} value={i.id}>{i.item_code} — {i.item_name}</option>
           ))}
         </Select>
       </div>

@@ -121,7 +121,7 @@ export function ProcessExecutionSection({
       consumable_master_id: exec.consumable_master_id ?? null,
       consumable_batch:     exec.consumable_batch ?? "",
       weld_metal:           (exec as ProcessExecution & { weld_metal?: string }).weld_metal ?? "",
-      consumable_feed_rate_planned: exec.consumable_feed_rate_planned ?? undefined,
+      consumable_feed_rate_planned: exec.consumable_feed_rate_planned ?? "",
       consumable_feed_rate: exec.consumable_feed_rate ?? undefined,
       amps_required:        exec.amps_required ?? "",
       amps_actual:          exec.amps_actual ?? undefined,
@@ -129,15 +129,15 @@ export function ProcessExecutionSection({
       volts_actual:         exec.volts_actual ?? undefined,
       polarity_planned:     exec.polarity_planned ?? "",
       polarity:             exec.polarity ?? "",
-      pre_heat_temp_planned:   exec.pre_heat_temp_planned ?? undefined,
+      pre_heat_temp_planned:   exec.pre_heat_temp_planned ?? "",
       pre_heat_temp:        exec.pre_heat_temp ?? undefined,
-      inter_pass_temp_planned: exec.inter_pass_temp_planned ?? undefined,
+      inter_pass_temp_planned: exec.inter_pass_temp_planned ?? "",
       inter_pass_temp:      exec.inter_pass_temp ?? undefined,
-      post_heat_temp_planned:  exec.post_heat_temp_planned ?? undefined,
+      post_heat_temp_planned:  exec.post_heat_temp_planned ?? "",
       post_heat_temp:       exec.post_heat_temp ?? undefined,
-      travel_speed_planned: exec.travel_speed_planned ?? undefined,
+      travel_speed_planned: exec.travel_speed_planned ?? "",
       travel_speed:         exec.travel_speed ?? undefined,
-      gas_flow_rate_planned: exec.gas_flow_rate_planned ?? undefined,
+      gas_flow_rate_planned: exec.gas_flow_rate_planned ?? "",
       gas_flow_rate:        exec.gas_flow_rate ?? undefined,
       weld_height:          exec.weld_height ?? undefined,
       notes:                exec.notes ?? "",
@@ -486,8 +486,8 @@ export function ProcessExecutionSection({
                       <Input type="number" step="1" {...register("weld_qty_actual", { valueAsNumber: true })} />
                     </div>
                     <div className="space-y-1">
-                      <Label>Feed Rate — WPS (m/min)</Label>
-                      <Input type="number" step="0.1" {...register("consumable_feed_rate_planned", { valueAsNumber: true })} />
+                      <Label>Feed Rate — WPS (m/min, range)</Label>
+                      <Input placeholder="e.g. 0.5-1" {...register("consumable_feed_rate_planned")} />
                     </div>
                     <div className="space-y-1">
                       <Label>Feed Rate — Actual (m/min)</Label>
@@ -542,16 +542,16 @@ export function ProcessExecutionSection({
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Thermal Parameters (WPS / Actual °C)</p>
                   <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-1">
-                      <Label>Pre-heat — WPS</Label>
-                      <Input type="number" {...register("pre_heat_temp_planned", { valueAsNumber: true })} />
+                      <Label>Pre-heat — WPS (range)</Label>
+                      <Input placeholder="e.g. 100-160" {...register("pre_heat_temp_planned")} />
                     </div>
                     <div className="space-y-1">
-                      <Label>Inter-pass — WPS</Label>
-                      <Input type="number" {...register("inter_pass_temp_planned", { valueAsNumber: true })} />
+                      <Label>Inter-pass — WPS (range)</Label>
+                      <Input placeholder="e.g. 250-300" {...register("inter_pass_temp_planned")} />
                     </div>
                     <div className="space-y-1">
-                      <Label>Post-heat — WPS</Label>
-                      <Input type="number" {...register("post_heat_temp_planned", { valueAsNumber: true })} />
+                      <Label>Post-heat — WPS (range)</Label>
+                      <Input placeholder="e.g. 600-650" {...register("post_heat_temp_planned")} />
                     </div>
                     <div className="space-y-1">
                       <Label>Pre-heat — Actual</Label>
@@ -573,8 +573,8 @@ export function ProcessExecutionSection({
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Other</p>
                   <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-1">
-                      <Label>Travel Speed — WPS (mm/min)</Label>
-                      <Input type="number" step="0.1" {...register("travel_speed_planned", { valueAsNumber: true })} />
+                      <Label>Travel Speed — WPS (mm/min, range)</Label>
+                      <Input placeholder="e.g. 150-200" {...register("travel_speed_planned")} />
                     </div>
                     <div className="space-y-1">
                       <Label>Travel Speed — Actual (mm/min)</Label>
@@ -585,8 +585,8 @@ export function ProcessExecutionSection({
                       <Input type="number" step="0.1" {...register("weld_height", { valueAsNumber: true })} />
                     </div>
                     <div className="space-y-1">
-                      <Label>Gas Flow — WPS (l/min)</Label>
-                      <Input type="number" step="0.1" {...register("gas_flow_rate_planned", { valueAsNumber: true })} />
+                      <Label>Gas Flow — WPS (l/min, range)</Label>
+                      <Input placeholder="e.g. 10-14" {...register("gas_flow_rate_planned")} />
                     </div>
                     <div className="space-y-1">
                       <Label>Gas Flow — Actual (l/min)</Label>

@@ -18,7 +18,8 @@ export const processExecutionSchema = z.object({
   consumable_master_id: z.string().uuid().nullable().optional(),
   consumable_batch:    z.string().optional(),
   weld_metal:          z.string().optional(),
-  consumable_feed_rate_planned: z.number().optional(),
+  // Ranges, same as amps_required/volts_required below (e.g. "50-100 mm/min").
+  consumable_feed_rate_planned: z.string().optional(),
   consumable_feed_rate: z.number().optional(),
   // Electrical parameters
   amps_required:       z.string().optional(),
@@ -30,17 +31,19 @@ export const processExecutionSchema = z.object({
   // rejects an empty string, which otherwise blocks saving non-welding steps.
   polarity_planned:    z.string().optional(),
   polarity:            z.string().optional(),
-  // Thermal
-  pre_heat_temp_planned:   z.number().optional(),
+  // Thermal — the "_planned" (WPS) values are ranges, e.g. "100-160"; the
+  // DB columns were widened to text to match (see migration 0063). Actual
+  // measured values stay numeric — one real reading, not a spec range.
+  pre_heat_temp_planned:   z.string().optional(),
   pre_heat_temp:       z.number().optional(),
-  inter_pass_temp_planned: z.number().optional(),
+  inter_pass_temp_planned: z.string().optional(),
   inter_pass_temp:     z.number().optional(),
-  post_heat_temp_planned:  z.number().optional(),
+  post_heat_temp_planned:  z.string().optional(),
   post_heat_temp:      z.number().optional(),
   // Other
-  travel_speed_planned: z.number().optional(),
+  travel_speed_planned: z.string().optional(),
   travel_speed:        z.number().optional(),
-  gas_flow_rate_planned: z.number().optional(),
+  gas_flow_rate_planned: z.string().optional(),
   gas_flow_rate:       z.number().optional(),
   weld_height:         z.number().optional(),
   notes:               z.string().optional(),

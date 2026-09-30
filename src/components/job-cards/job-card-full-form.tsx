@@ -266,14 +266,14 @@ export function JobCardFullForm({
                   <tbody>
                     <tr>
                       <td className="border border-border p-1 font-medium text-muted-foreground">As per WPS</td>
-                      <td className="border border-border p-0.5"><Input className="h-7 border-0" type="number" {...register("pre_heat_temp_planned", num)} /></td>
-                      <td className="border border-border p-0.5"><Input className="h-7 border-0" type="number" {...register("inter_pass_temp_planned", num)} /></td>
-                      <td className="border border-border p-0.5"><Input className="h-7 border-0" type="number" {...register("post_heat_temp_planned", num)} /></td>
+                      <td className="border border-border p-0.5"><Input className="h-7 border-0" placeholder="100-160" {...register("pre_heat_temp_planned")} /></td>
+                      <td className="border border-border p-0.5"><Input className="h-7 border-0" placeholder="250-300" {...register("inter_pass_temp_planned")} /></td>
+                      <td className="border border-border p-0.5"><Input className="h-7 border-0" placeholder="600-650" {...register("post_heat_temp_planned")} /></td>
                       <td className="border border-border p-0.5"><Input className="h-7 border-0" placeholder="140-180" {...register("amps_required")} /></td>
                       <td className="border border-border p-0.5"><Input className="h-7 border-0" placeholder="24-28" {...register("volts_required")} /></td>
-                      <td className="border border-border p-0.5"><Input className="h-7 border-0" type="number" step="0.1" {...register("travel_speed_planned", num)} /></td>
-                      <td className="border border-border p-0.5"><Input className="h-7 border-0" type="number" step="0.1" {...register("gas_flow_rate_planned", num)} /></td>
-                      <td className="border border-border p-0.5"><Input className="h-7 border-0" type="number" step="0.1" {...register("consumable_feed_rate_planned", num)} /></td>
+                      <td className="border border-border p-0.5"><Input className="h-7 border-0" placeholder="150-200" {...register("travel_speed_planned")} /></td>
+                      <td className="border border-border p-0.5"><Input className="h-7 border-0" placeholder="10-14" {...register("gas_flow_rate_planned")} /></td>
+                      <td className="border border-border p-0.5"><Input className="h-7 border-0" placeholder="e.g. 0.5-1" {...register("consumable_feed_rate_planned")} /></td>
                       <td className="border border-border p-0.5">
                         <select className="h-7 w-full border-0 bg-transparent text-xs" {...register("polarity_planned")}>
                           <option value="">—</option><option value="DCRP">DCRP</option><option value="DCSP">DCSP</option><option value="AC">AC</option>

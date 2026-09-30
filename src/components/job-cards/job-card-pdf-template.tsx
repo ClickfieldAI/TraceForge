@@ -52,6 +52,7 @@ const S = StyleSheet.create({
   gridHCell:  { borderRightWidth: 1, borderRightColor: "#111", paddingVertical: 4, paddingHorizontal: 3, fontFamily: "Helvetica-Bold", fontSize: 7, textAlign: "center" },
   gridRow:    { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#111" },
   gridCell:   { borderRightWidth: 1, borderRightColor: "#111", paddingVertical: 4, paddingHorizontal: 3, fontSize: 7, textAlign: "center" },
+  gridCellTall: { borderRightWidth: 1, borderRightColor: "#111", minHeight: 16 },
 
   footer:    { textAlign: "center", fontSize: 7, fontFamily: "Helvetica-Bold", padding: 3 },
 })
@@ -402,6 +403,18 @@ export function JobCardPdfTemplate({
               </Text>
             ))}
           </View>
+          {/* 4 blank rows, taller than the data row above — for additional
+              pieces' readings or handwritten notes, same as the paper form. */}
+          {[0, 1, 2, 3].map((row) => (
+            <View key={row} style={S.gridRow}>
+              {DRAWING_SIZE_GROUPS.flatMap((g) => g.cols).map((c, i, arr) => (
+                <Text
+                  key={`${c}-${i}`}
+                  style={[S.gridCellTall, { flex: 1 }, i === arr.length - 1 ? { borderRightWidth: 0 } : {}]}
+                />
+              ))}
+            </View>
+          ))}
 
           <Row3
             a={<LV label="Weld Deposit Thickness" value={jobCard.weld_deposit_thickness_before} />}

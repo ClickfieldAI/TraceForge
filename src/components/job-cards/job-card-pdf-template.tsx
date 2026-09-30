@@ -1,4 +1,15 @@
 // react-pdf/renderer template — server-side only, no "use client"
+//
+// Deliberately mirrors the physical "RAGHAV ENGINEERING JOB CARD" paper form
+// (Ref: QAF 113, Rev/0) cell-for-cell — same row grouping, same section
+// order, same table columns — per an explicit client requirement that the
+// generated PDF match the paper form exactly, not a redesigned layout. Every
+// field below maps to a column that was added specifically for this ("0025 —
+// full paper capture" in the job_cards migration), so nothing here is
+// invented — where the paper form has a cell the app has no matching data
+// for yet (e.g. the Hard Facing sub-columns of Drawing Size, which nothing
+// in the UI captures with that specific naming), the cell prints blank
+// rather than guessing.
 import React from "react"
 import {
   Document,
@@ -13,39 +24,37 @@ import type {
 } from "@/types/database"
 
 const S = StyleSheet.create({
-  page:         { fontFamily: "Helvetica", fontSize: 8, padding: 24, color: "#111" },
-  title:        { fontSize: 12, fontFamily: "Helvetica-Bold", textAlign: "center", marginBottom: 2 },
-  subtitle:     { fontSize: 9, textAlign: "center", marginBottom: 6, color: "#444" },
-  divider:      { borderBottomWidth: 1, borderBottomColor: "#aaa", marginBottom: 6, marginTop: 2 },
-  sectionHead:  { fontSize: 8, fontFamily: "Helvetica-Bold", backgroundColor: "#e0e7ff", padding: "3 6", marginBottom: 3, marginTop: 6 },
-  subHead:      { fontSize: 7.5, fontFamily: "Helvetica-Bold", marginTop: 3, marginBottom: 2, color: "#374151" },
+  page:      { fontFamily: "Helvetica", fontSize: 7.5, padding: 18, color: "#111" },
+  outer:     { borderWidth: 1.5, borderColor: "#111" },
 
-  grid2:        { flexDirection: "row", flexWrap: "wrap", gap: 2, marginBottom: 3 },
-  field:        { width: "48%", flexDirection: "row", borderWidth: 1, borderColor: "#d1d5db" },
-  fieldFull:    { width: "100%", flexDirection: "row", borderWidth: 1, borderColor: "#d1d5db", marginBottom: 2 },
-  label:        { backgroundColor: "#f3f4f6", paddingHorizontal: 4, paddingVertical: 2, fontFamily: "Helvetica-Bold", width: 96 },
-  value:        { paddingHorizontal: 4, paddingVertical: 2, flex: 1 },
+  headerRow: { flexDirection: "row", borderBottomWidth: 1.5, borderBottomColor: "#111" },
+  logoBox:   { width: 70, borderRightWidth: 1, borderRightColor: "#111", alignItems: "center", justifyContent: "center", padding: 4 },
+  logoText:  { fontSize: 16, fontFamily: "Helvetica-Bold" },
+  titleBox:  { flex: 1, borderRightWidth: 1, borderRightColor: "#111", alignItems: "center", justifyContent: "center", padding: 4 },
+  titleMain: { fontSize: 15, fontFamily: "Helvetica-Bold" },
+  titleSub:  { fontSize: 13, fontFamily: "Helvetica-Bold" },
+  jcBox:     { width: 190, padding: 3 },
+  jcLine:    { flexDirection: "row", marginBottom: 1 },
+  jcLabel:   { fontFamily: "Helvetica-Bold", width: 46 },
+  jcValue:   { flex: 1 },
 
-  table:        { marginTop: 3, marginBottom: 6, borderWidth: 1, borderColor: "#d1d5db" },
-  tableHeader:  { flexDirection: "row", backgroundColor: "#3730a3" },
-  thCell:       { paddingHorizontal: 3, paddingVertical: 3, fontFamily: "Helvetica-Bold", color: "#fff", borderRightWidth: 1, borderRightColor: "#a5b4fc", fontSize: 6.5 },
-  tableRow:     { flexDirection: "row", borderTopWidth: 1, borderTopColor: "#e5e7eb" },
-  tableRowAlt:  { flexDirection: "row", borderTopWidth: 1, borderTopColor: "#e5e7eb", backgroundColor: "#f5f5ff" },
-  tdCell:       { paddingHorizontal: 3, paddingVertical: 2, borderRightWidth: 1, borderRightColor: "#e5e7eb", fontSize: 6.5 },
+  // A 3-cell "Label : value" row, repeated for most of the header block.
+  row3:      { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#111" },
+  cell3:     { flex: 1, flexDirection: "row", borderRightWidth: 1, borderRightColor: "#111", padding: 2 },
+  cell3last: { flex: 1, flexDirection: "row", padding: 2 },
+  lbl:       { fontFamily: "Helvetica-Bold" },
+  val:       { flex: 1 },
 
-  sigRow: { flexDirection: "row", gap: 12, marginTop: 10 },
-  sigBox: { flex: 1, borderTopWidth: 1, borderTopColor: "#374151", paddingTop: 3, textAlign: "center" },
+  sectionBar: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#111", backgroundColor: "#e5e5e5" },
+  sectionTxt: { fontFamily: "Helvetica-Bold", fontSize: 8, padding: 3, textTransform: "uppercase" },
+
+  gridHeader: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#111", backgroundColor: "#f0f0f0" },
+  gridHCell:  { borderRightWidth: 1, borderRightColor: "#111", padding: 2, fontFamily: "Helvetica-Bold", fontSize: 6.5, textAlign: "center" },
+  gridRow:    { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#111" },
+  gridCell:   { borderRightWidth: 1, borderRightColor: "#111", padding: 2, fontSize: 6.5, textAlign: "center" },
+
+  footer:    { textAlign: "center", fontSize: 7, fontFamily: "Helvetica-Bold", padding: 3 },
 })
-
-function Field({ label, value, full }: { label: string; value?: string | number | null; full?: boolean }) {
-  const style = full ? S.fieldFull : S.field
-  return (
-    <View style={style}>
-      <Text style={S.label}>{label}</Text>
-      <Text style={S.value}>{value ?? ""}</Text>
-    </View>
-  )
-}
 
 function fmtDate(d?: string | null): string {
   if (!d) return ""
@@ -54,69 +63,105 @@ function fmtDate(d?: string | null): string {
   return dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
 }
 
-const PROCESS_LABELS: Record<string, string> = {
-  welding: "Welding", machining: "Machining", cladding: "Cladding", overlay: "Overlay",
+function v(x: string | number | null | undefined): string {
+  return x === null || x === undefined ? "" : String(x)
 }
 
-// Inlined (not imported) so the standalone PDF renderer needs no path resolution.
-const OPERATION_LABELS: Record<string, string> = {
-  pre_machining: "Pre-Machining", welding: "Welding", final_machining: "Final Machining",
-  milling: "Milling", slitting: "Slitting", deburring: "Deburring",
+/** One "Label : value" cell, used three-per-row throughout the header block. */
+function LV({ label, value, last }: { label: string; value: string | number | null | undefined; last?: boolean }) {
+  return (
+    <View style={last ? S.cell3last : S.cell3}>
+      <Text style={S.lbl}>{label} : </Text>
+      <Text style={S.val}>{v(value)}</Text>
+    </View>
+  )
 }
-const OP_STATUS_LABELS: Record<string, string> = {
-  assigned: "Assigned", in_progress: "In Progress", completed: "Completed", skipped: "Skipped",
+
+function Row3({ a, b, c }: { a: React.ReactNode; b: React.ReactNode; c: React.ReactNode }) {
+  return <View style={S.row3}>{a}{b}{c}</View>
 }
+
+function SectionBar({ children }: { children: React.ReactNode }) {
+  return <View style={S.sectionBar}><Text style={S.sectionTxt}>{children}</Text></View>
+}
+
 const WELDING_FAMILY = ["welding", "cladding", "overlay"]
 
 type ExecRow = ProcessExecutionWithConsumable & {
   machine?: { machine_code: string; name: string } | null
 }
 
-// A routed record whose operation is welding, or a legacy welding-family record.
 function isWeldingExec(e: ExecRow): boolean {
   if (e.operation_type) return e.operation_type === "welding"
   return WELDING_FAMILY.includes(e.process_type)
 }
 
-const OP_COLS = [
-  { label: "#",         width: 20 },
-  { label: "Operation", width: 90 },
-  { label: "Machine",   width: 75 },
-  { label: "Operator",  width: 80 },
-  { label: "Planned",   width: 45 },
-  { label: "Completed", width: 50 },
-  { label: "Rejected",  width: 45 },
-  { label: "Status",    width: 65 },
-]
+// Welding Details table — one column per weld parameter, one row per
+// instance (the WPS-required row, the overall Actual row, then one row per
+// dated welding pass), matching the paper form's horizontal layout exactly
+// (the original template ran this the other way — one row per parameter).
+const WELD_COLS = [
+  { key: "qty",     label: "Actual Qty",           width: 52 },
+  { key: "date",    label: "Weld Date",            width: 48 },
+  { key: "preheat", label: "Pre Heat temp",        width: 52 },
+  { key: "inter",   label: "Inter-pass temp",      width: 56 },
+  { key: "post",    label: "Post Heat temp",       width: 52 },
+  { key: "amp",     label: "Amp",                  width: 34 },
+  { key: "volt",    label: "Volt",                 width: 34 },
+  { key: "travel",  label: "Travel Speed",         width: 50 },
+  { key: "gas",     label: "Gas flow rate",        width: 54 },
+  { key: "feed",    label: "Consumable feed rate", width: 58 },
+  { key: "pol",     label: "Polarity",             width: 42 },
+] as const
 
-const CHEM_COLS = [
-  { key: "chemical_type", label: "Type",         width: 55 },
-  { key: "chemical_name", label: "Chemical",      width: 95 },
-  { key: "manufacturer",  label: "Manufacturer",  width: 90 },
-  { key: "batch_no",      label: "Batch No.",     width: 65 },
-  { key: "expiry_date",   label: "Expiry",        width: 55 },
-]
+type WeldTableRow = Record<(typeof WELD_COLS)[number]["key"], string>
 
-const DIM_COLS = [
-  { key: "dimension_name",     label: "Dimension",  width: 130 },
-  { key: "required_dimension", label: "Required",   width: 60 },
-  { key: "tolerance",          label: "Tolerance",  width: 55 },
-  { key: "actual_value_1",     label: "Actual 1",   width: 50 },
-  { key: "actual_value_2",     label: "Actual 2",   width: 50 },
-  { key: "actual_value_3",     label: "Actual 3",   width: 50 },
-  { key: "pass_fail",          label: "P/F",        width: 40 },
-]
+function weldRows(executions: ExecRow[]): WeldTableRow[] {
+  const welds = executions.filter(isWeldingExec)
+  if (welds.length === 0) return []
+  const first = welds[0]
 
-type DimensionRow = {
-  dimension_name?: string; required_dimension?: string; tolerance?: string
-  actual_value_1?: string; actual_value_2?: string; actual_value_3?: string; pass_fail?: string
+  const wpsRow: WeldTableRow = {
+    qty: "As Per wp's", date: "",
+    preheat: v(first.pre_heat_temp_planned), inter: v(first.inter_pass_temp_planned), post: v(first.post_heat_temp_planned),
+    amp: v(first.amps_required), volt: v(first.volts_required), travel: v(first.travel_speed_planned),
+    gas: v(first.gas_flow_rate_planned), feed: v(first.consumable_feed_rate_planned), pol: v(first.polarity_planned),
+  }
+  const actualSummaryRow: WeldTableRow = {
+    qty: "Actual", date: "",
+    preheat: "", inter: "", post: "",
+    amp: v(first.amps_actual), volt: v(first.volts_actual), travel: v(first.travel_speed),
+    gas: "", feed: "", pol: "",
+  }
+  const dated: WeldTableRow[] = welds.map((e) => ({
+    qty: v(e.weld_qty_actual), date: fmtDate(e.weld_date),
+    preheat: v(e.pre_heat_temp), inter: v(e.inter_pass_temp), post: v(e.post_heat_temp),
+    amp: v(e.amps_actual), volt: v(e.volts_actual), travel: v(e.travel_speed),
+    gas: v(e.gas_flow_rate), feed: v(e.consumable_feed_rate), pol: v(e.polarity),
+  }))
+  return [wpsRow, actualSummaryRow, ...dated]
 }
 
-type PwhtRunSummary = {
-  chart_number: string; process_name: string | null
-  loading_temp: number; loading_time: number | null
-  soaking_temp: number; soaking_time: number
-  unloading_temp: number | null; unloading_time: number | null
+const CHEM_ROW_TYPES = ["penetrant", "cleaner", "developer", "remover"] as const
+
+// Two sub-groups of the paper form's "Drawing Size" table. Nothing in the
+// current dimension-entry UI captures values under these exact names yet
+// (it captures a free-form dimensions array), so this renders the header
+// grid faithfully and fills a cell only when a dimension entry's name
+// matches — blank otherwise, rather than inventing a value.
+const DRAWING_SIZE_GROUPS = [
+  { group: "Milling",              cols: ["GSM", "PSM"] },
+  { group: "Soft / Pre Machining", cols: ["OAL", "OD", "ID", "Top/OAH"] },
+  { group: "Hard Facing",          cols: ["OD", "ID", "Top/OAH"] },
+] as const
+
+function findDimensionValue(dimensions: Record<string, unknown>[] | null | undefined, name: string, occurrence: number): string {
+  if (!Array.isArray(dimensions)) return ""
+  const matches = dimensions.filter((d) => String(d.dimension_name ?? "").trim().toLowerCase() === name.toLowerCase())
+  const row = matches[occurrence]
+  if (!row) return ""
+  const val = row.actual_value_1 ?? row.required_dimension
+  return val === null || val === undefined ? "" : String(val)
 }
 
 export function JobCardPdfTemplate({
@@ -129,268 +174,256 @@ export function JobCardPdfTemplate({
   airTests: AirTestRecord[]
   dimensionReports: DimensionReport[]
   dispatches: Dispatch[]
-  pwhtRuns: PwhtRunSummary[]
+  pwhtRuns: {
+    chart_number: string; process_name: string | null
+    loading_temp: number; loading_time: number | null
+    soaking_temp: number; soaking_time: number
+    unloading_temp: number | null; unloading_time: number | null
+  }[]
 }) {
+  const nde = ndeRecords[0]
+  const pwht = pwhtRuns[0]
+  const air = airTests[0]
+  const dim = dimensionReports[0]
+  const dispatch = dispatches[0]
+  const chemicals = (nde?.chemicals_used_json as unknown as OverlayChemicalEntry[] | null) ?? []
+  const chemByType = new Map(chemicals.map((c) => [c.chemical_type.toLowerCase(), c]))
+  const wRows = weldRows(executions)
+
+  // Cumulative occurrence index so a dimension name that legitimately
+  // repeats (e.g. "OD" under both Soft/Pre Machining and Hard Facing) reads
+  // its own distinct entry rather than the same one twice.
+  const seen = new Map<string, number>()
+  function nextValue(name: string): string {
+    const n = (seen.get(name) ?? 0)
+    seen.set(name, n + 1)
+    return findDimensionValue(dim?.dimensions, name, n)
+  }
+
   return (
     <Document title={`Job Card — ${jobCard.jc_number}`}>
       <Page size="A4" style={S.page}>
+        <View style={S.outer}>
 
-        <Text style={S.title}>RAGHAV ENGINEERING</Text>
-        <Text style={S.subtitle}>Job Card — {jobCard.jc_number}</Text>
-        <View style={S.divider} />
+          {/* Header: logo | title | J.C. No / Date / Process */}
+          <View style={S.headerRow}>
+            <View style={S.logoBox}><Text style={S.logoText}>RE</Text></View>
+            <View style={S.titleBox}>
+              <Text style={S.titleMain}>RAGHAV ENGINEERING</Text>
+              <Text style={S.titleSub}>JOB CARD</Text>
+            </View>
+            <View style={S.jcBox}>
+              <View style={S.jcLine}><Text style={S.jcLabel}>J.C. No.</Text><Text style={S.jcValue}>: {v(jobCard.jc_number)}</Text></View>
+              <View style={S.jcLine}><Text style={S.jcLabel}>Date</Text><Text style={S.jcValue}>: {fmtDate(jobCard.received_date)}</Text></View>
+              <View style={S.jcLine}><Text style={S.jcLabel}>Process</Text></View>
+              <Text style={{ fontSize: 6 }}>SAW/PTAW/GTAW/GMAW/SMAW/MACHINING/FCAW</Text>
+            </View>
+          </View>
 
-        {/* Basic Info */}
-        <Text style={S.sectionHead}>Basic Information</Text>
-        <View style={S.grid2}>
-          <Field label="Job Card No." value={jobCard.jc_number} />
-          <Field label="Received Date" value={fmtDate(jobCard.received_date)} />
-          <Field label="Due Date" value={fmtDate(jobCard.due_date)} />
-          <Field label="Customer" value={client?.name} />
-          <Field label="NBDN No." value={jobCard.nbdn_number} />
-          <Field label="PO No." value={jobCard.po_number} />
-          <Field label="Drawing No." value={jobCard.drawing_number} />
-          <Field label="Heat No." value={jobCard.heat_number} />
-          <Field label="Part No." value={jobCard.part_number} />
-          <Field label="Quantity" value={jobCard.quantity} />
-          <Field label="Process" value={jobCard.process_type.map((t) => PROCESS_LABELS[t] ?? t).join(", ")} />
-          <Field label="Welding Process" value={jobCard.welding_process} />
-          <Field label="Ring" value={jobCard.ring} />
-        </View>
-        <Field label="Description" value={jobCard.description} full />
+          <Row3
+            a={<LV label="Customer" value={client?.name} />}
+            b={<LV label="Product Group" value={jobCard.product_group} />}
+            c={<LV label="Buyer" value={jobCard.buyer} last />}
+          />
+          <Row3
+            a={<LV label="Description" value={jobCard.description} />}
+            b={<LV label="Qty" value={jobCard.quantity} />}
+            c={<LV label="Part No." value={jobCard.part_number} last />}
+          />
+          <Row3
+            a={<LV label="Ring" value={jobCard.ring} />}
+            b={<LV label="Ring Heat No." value={jobCard.ring_heat_no} />}
+            c={<LV label="P.O. No." value={jobCard.po_number} last />}
+          />
+          <Row3
+            a={<LV label="NBDN No." value={jobCard.nbdn_number} />}
+            b={<LV label="Regularization" value={jobCard.regularization} />}
+            c={<LV label="Heat No." value={jobCard.heat_number} last />}
+          />
+          <Row3
+            a={<LV label="Drawing No." value={jobCard.drawing_number} />}
+            b={<LV label="WPS No." value={jobCard.wps_no} />}
+            c={<LV label="Mpi / Rt No." value={jobCard.mpi_rt_no} last />}
+          />
 
-        {/* Customer / Material */}
-        <Text style={S.sectionHead}>Customer / Material Details</Text>
-        <View style={S.grid2}>
-          <Field label="Product Group" value={jobCard.product_group} />
-          <Field label="Buyer" value={jobCard.buyer} />
-          <Field label="Material Code" value={jobCard.material_code} />
-          <Field label="Valve Size/Class" value={jobCard.valve_size_class} />
-          <Field label="Valve Type/Comp." value={jobCard.valve_type_component} />
-          <Field label="Base Material" value={jobCard.base_material} />
-          <Field label="Overlay Material" value={jobCard.overlay_material} />
-          <Field label="Base Mat. Grade" value={jobCard.base_material_grade} />
-          <Field label="Regularization" value={jobCard.regularization} />
-          <Field label="Ring Heat No." value={jobCard.ring_heat_no} />
-          <Field label="MPI / RT No." value={jobCard.mpi_rt_no} />
-          <Field label="Punching Details" value={jobCard.punching_details} />
-          <Field label="Other Details" value={jobCard.other_details} />
-        </View>
+          {/* Consumable Data */}
+          <View style={S.gridHeader}>
+            <Text style={[S.gridHCell, { width: 90, textAlign: "left" }]}>Consumable Data</Text>
+            {["Brand", "AWS No.", "Size", "Batch No", "MFG. Date"].map((h) => (
+              <Text key={h} style={[S.gridHCell, { flex: 1 }]}>{h}</Text>
+            ))}
+          </View>
+          <View style={S.gridRow}>
+            <Text style={[S.gridCell, { width: 90 }]} />
+            <Text style={[S.gridCell, { flex: 1 }]}>{v(jobCard.consumable_brand)}</Text>
+            <Text style={[S.gridCell, { flex: 1 }]}>{v(jobCard.consumable_aws_class)}</Text>
+            <Text style={[S.gridCell, { flex: 1 }]}>{v(jobCard.consumable_size)}</Text>
+            <Text style={[S.gridCell, { flex: 1 }]}>{v(jobCard.consumable_batch_no)}</Text>
+            <Text style={[S.gridCell, { flex: 1, borderRightWidth: 0 }]}>{fmtDate(jobCard.consumable_mfg_date)}</Text>
+          </View>
 
-        {/* Operations / Routing */}
-        {executions.some((e) => e.operation_type != null) && (
-          <>
-            <Text style={S.sectionHead}>Operations / Routing</Text>
-            <View style={S.table}>
-              <View style={S.tableHeader}>
-                {OP_COLS.map((c) => (
-                  <Text key={c.label} style={[S.thCell, { width: c.width }]}>{c.label}</Text>
+          {/* Welding Details */}
+          <SectionBar>Welding Details</SectionBar>
+          <Row3
+            a={<LV label="Welder Name" value={executions.find(isWeldingExec)?.welder_name} />}
+            b={<LV label="Weld Metal" value={executions.find(isWeldingExec)?.weld_metal} />}
+            c={<LV label="Weld Height" value={executions.find(isWeldingExec)?.weld_height} last />}
+          />
+          {wRows.length > 0 && (
+            <>
+              <View style={S.gridHeader}>
+                {WELD_COLS.map((c, ci) => (
+                  <Text
+                    key={c.key}
+                    style={[S.gridHCell, ci === WELD_COLS.length - 1 ? { flex: 1, borderRightWidth: 0 } : { width: c.width }]}
+                  >
+                    {c.label}
+                  </Text>
                 ))}
               </View>
-              {[...executions]
-                .filter((e) => e.operation_type != null)
-                .sort((a, b) => (a.sequence_no ?? 0) - (b.sequence_no ?? 0))
-                .map((e, i) => (
-                  <View key={e.id ?? i} style={i % 2 === 0 ? S.tableRow : S.tableRowAlt}>
-                    <Text style={[S.tdCell, { width: 20 }]}>{e.sequence_no ?? ""}</Text>
-                    <Text style={[S.tdCell, { width: 90 }]}>{OPERATION_LABELS[e.operation_type as string] ?? e.operation_type}</Text>
-                    <Text style={[S.tdCell, { width: 75 }]}>{e.machine?.machine_code ?? ""}</Text>
-                    <Text style={[S.tdCell, { width: 80 }]}>{e.welder_name ?? ""}</Text>
-                    <Text style={[S.tdCell, { width: 45 }]}>{e.planned_qty ?? ""}</Text>
-                    <Text style={[S.tdCell, { width: 50 }]}>{e.completed_qty ?? ""}</Text>
-                    <Text style={[S.tdCell, { width: 45 }]}>{e.rejected_qty ?? ""}</Text>
-                    <Text style={[S.tdCell, { width: 65 }]}>{OP_STATUS_LABELS[e.status] ?? e.status}</Text>
-                  </View>
-                ))}
-            </View>
-          </>
-        )}
-
-        {/* Welding */}
-        {executions.some(isWeldingExec) && (
-          <>
-            <Text style={S.sectionHead}>Welding Details</Text>
-            {executions.filter(isWeldingExec).map((e, i) => (
-              <View key={e.id ?? i} style={{ marginBottom: 4 }}>
-                <Text style={S.subHead}>{PROCESS_LABELS[e.process_type] ?? e.process_type} — {e.welder_name ?? ""} {e.welder_id ? `(ID: ${e.welder_id})` : ""}</Text>
-                <View style={S.grid2}>
-                  <Field label="Weld Date" value={fmtDate(e.weld_date)} />
-                  <Field label="Weld Metal" value={e.weld_metal} />
-                  <Field label="Weld Height" value={e.weld_height} />
-                  <Field label="Consumable Batch" value={e.consumable?.batch_no ?? e.consumable_batch} />
-                </View>
-                {e.consumable && (
-                  <View style={S.grid2}>
-                    <Field label="Consumable Brand" value={e.consumable.brand} />
-                    <Field label="Product Name" value={e.consumable.product_name} />
-                    <Field label="AWS Class" value={e.consumable.aws_class} />
-                    <Field label="Size" value={e.consumable.size} />
-                    <Field label="Mfg. Date" value={fmtDate(e.consumable.manufacturing_date)} />
-                    <Field label="Expiry Date" value={fmtDate(e.consumable.expiry_date)} />
-                  </View>
-                )}
-                <View style={S.table}>
-                  <View style={S.tableHeader}>
-                    <Text style={[S.thCell, { width: 130 }]}>Parameter</Text>
-                    <Text style={[S.thCell, { width: 120 }]}>As per WPS</Text>
-                    <Text style={[S.thCell, { width: 120 }]}>Actual</Text>
-                  </View>
-                  {[
-                    { label: "Weld Qty",       wps: e.weld_qty_planned,            act: e.weld_qty_actual },
-                    { label: "Pre-heat (°C)",  wps: e.pre_heat_temp_planned,       act: e.pre_heat_temp },
-                    { label: "Inter-pass (°C)",wps: e.inter_pass_temp_planned,     act: e.inter_pass_temp },
-                    { label: "Post-heat (°C)", wps: e.post_heat_temp_planned,      act: e.post_heat_temp },
-                    { label: "Amp",            wps: e.amps_required,               act: e.amps_actual },
-                    { label: "Volt",           wps: e.volts_required,              act: e.volts_actual },
-                    { label: "Travel Speed",   wps: e.travel_speed_planned,        act: e.travel_speed },
-                    { label: "Gas Flow Rate",  wps: e.gas_flow_rate_planned,       act: e.gas_flow_rate },
-                    { label: "Feed Rate",      wps: e.consumable_feed_rate_planned, act: e.consumable_feed_rate },
-                    { label: "Polarity",       wps: e.polarity_planned,            act: e.polarity },
-                  ].map((row, ri) => (
-                    <View key={row.label} style={ri % 2 === 0 ? S.tableRow : S.tableRowAlt}>
-                      <Text style={[S.tdCell, { width: 130 }]}>{row.label}</Text>
-                      <Text style={[S.tdCell, { width: 120 }]}>{row.wps ?? ""}</Text>
-                      <Text style={[S.tdCell, { width: 120 }]}>{row.act ?? ""}</Text>
-                    </View>
+              {wRows.map((row, i) => (
+                <View key={i} style={S.gridRow}>
+                  {WELD_COLS.map((c, ci) => (
+                    <Text
+                      key={c.key}
+                      style={[S.gridCell, ci === WELD_COLS.length - 1 ? { flex: 1, borderRightWidth: 0 } : { width: c.width }]}
+                    >
+                      {row[c.key]}
+                    </Text>
                   ))}
                 </View>
-              </View>
-            ))}
-          </>
-        )}
+              ))}
+            </>
+          )}
 
-        {/* PWHT */}
-        {pwhtRuns.length > 0 && (
-          <>
-            <Text style={S.sectionHead}>PWHT Details</Text>
-            {pwhtRuns.map((p, i) => (
-              <View key={i} style={S.grid2}>
-                <Field label="Chart No." value={p.chart_number} />
-                <Field label="Process" value={p.process_name} />
-                <Field label="Loading Temp" value={p.loading_temp} />
-                <Field label="Loading Time" value={p.loading_time} />
-                <Field label="Soaking Temp" value={p.soaking_temp} />
-                <Field label="Soaking Time" value={p.soaking_time} />
-                <Field label="Unloading Temp" value={p.unloading_temp} />
-                <Field label="Unloading Time" value={p.unloading_time} />
-              </View>
-            ))}
-          </>
-        )}
+          {/* PWHT Details */}
+          <SectionBar>PWHT Details</SectionBar>
+          <Row3
+            a={<LV label="H. Chart No." value={pwht?.chart_number} />}
+            b={<LV label="Process" value={pwht?.process_name} last />}
+            c={<></>}
+          />
+          <Row3
+            a={<LV label="Loading Temp" value={pwht?.loading_temp} />}
+            b={<LV label="Loading Time" value={pwht?.loading_time} last />}
+            c={<></>}
+          />
+          <Row3
+            a={<LV label="Soaking Temp" value={pwht?.soaking_temp} />}
+            b={<LV label="Soaking Time" value={pwht?.soaking_time} last />}
+            c={<></>}
+          />
+          <Row3
+            a={<LV label="Unloading Temp" value={pwht?.unloading_temp} />}
+            b={<LV label="Unloading Time" value={pwht?.unloading_time} last />}
+            c={<></>}
+          />
 
-        {/* Air Testing */}
-        {airTests.length > 0 && (
-          <>
-            <Text style={S.sectionHead}>Air Testing &amp; Inspection</Text>
-            {airTests.map((a) => (
-              <View key={a.id} style={S.grid2}>
-                <Field label="Tester Name" value={a.tester_name} />
-                <Field label="Pressure" value={a.pressure} />
-                <Field label="Duration" value={a.duration} />
-                <Field label="Result" value={a.result} />
-              </View>
-            ))}
-          </>
-        )}
-
-        {/* NDE */}
-        {ndeRecords.map((r) => (
-          <View key={r.id} style={{ marginBottom: 4 }}>
-            <Text style={S.sectionHead}>NDE / LPT — {r.nde_type.toUpperCase()}</Text>
-            <View style={S.grid2}>
-              <Field label="NDE Number" value={r.nde_number} />
-              <Field label="Report No." value={r.report_number} />
-              <Field label="Test Coupon No." value={r.test_coupon_number} />
-              <Field label="Deposit Thickness" value={r.deposit_thickness} />
-              <Field label="Hardness Req." value={r.hardness_requirement} />
-              <Field label="Duration" value={r.duration} />
-              <Field label="Observer" value={r.observer} />
-              <Field label="Inspected By" value={r.inspected_by} />
-              <Field label="Result" value={r.result} />
-            </View>
-            {Array.isArray(r.chemicals_used_json) && (r.chemicals_used_json as unknown as OverlayChemicalEntry[]).length > 0 && (
-              <View style={S.table}>
-                <View style={S.tableHeader}>
-                  {CHEM_COLS.map((c) => <Text key={c.key} style={[S.thCell, { width: c.width }]}>{c.label}</Text>)}
-                </View>
-                {(r.chemicals_used_json as unknown as OverlayChemicalEntry[]).map((ch, i) => (
-                  <View key={i} style={i % 2 === 0 ? S.tableRow : S.tableRowAlt}>
-                    {CHEM_COLS.map((c) => (
-                      <Text key={c.key} style={[S.tdCell, { width: c.width }]}>{ch[c.key as keyof OverlayChemicalEntry] ?? ""}</Text>
-                    ))}
-                  </View>
-                ))}
-              </View>
-            )}
+          {/* Air Testing & Inspection */}
+          <SectionBar>Air Testing &amp; Inspection</SectionBar>
+          <Row3
+            a={<LV label="Tester Name" value={air?.tester_name} />}
+            b={<LV label="Pressure" value={air?.pressure} />}
+            c={<LV label="Duration" value={air?.duration} last />}
+          />
+          <View style={S.row3}>
+            <LV label="Result" value={air?.result} last />
           </View>
-        ))}
 
-        {/* Machining / Dimensions */}
-        {dimensionReports.map((d) => {
-          const rows = Array.isArray(d.dimensions) ? (d.dimensions as unknown as DimensionRow[]) : []
-          return (
-            <View key={d.id} style={{ marginBottom: 4 }}>
-              <Text style={S.sectionHead}>Machining / Dimensions</Text>
-              <View style={S.grid2}>
-                <Field label="Machine Name" value={d.machine_name} />
-                <Field label="Operator" value={d.operator} />
-                <Field label="Drawing Size" value={d.drawing_size} />
-                <Field label="Deposit Thk. Before" value={d.weld_deposit_thickness_before} />
-                <Field label="Deposit Thk. After" value={d.weld_deposit_thickness_after} />
+          {/* Non Destructive Examinations */}
+          <SectionBar>Non Destructive Examinations</SectionBar>
+          <Row3
+            a={<LV label="Test Coupon No." value={nde?.test_coupon_number} />}
+            b={<LV label="Deposit Thickness" value={nde?.deposit_thickness} />}
+            c={<LV label="Hardness, Req" value={nde?.hardness_requirement} last />}
+          />
+          <Row3
+            a={<LV label="NDE No" value={nde?.nde_number} />}
+            b={<LV label="NDE Report No" value={nde?.report_number} />}
+            c={<LV label="Duration" value={nde?.duration} last />}
+          />
+          <Row3
+            a={<LV label="Obser" value={nde?.observer} />}
+            b={<LV label="Result" value={nde?.result} />}
+            c={<></>}
+          />
+          <View style={S.gridHeader}>
+            <Text style={[S.gridHCell, { flex: 1, textAlign: "left" }]}>Chemical Name</Text>
+            <Text style={[S.gridHCell, { flex: 1 }]}>Batch No.</Text>
+            <Text style={[S.gridHCell, { flex: 1 }]}>Manufacturer&apos;s Name</Text>
+            <Text style={[S.gridHCell, { flex: 1, borderRightWidth: 0 }]}>Expiry Date</Text>
+          </View>
+          {CHEM_ROW_TYPES.filter((t) => chemByType.has(t)).map((t) => {
+            const c = chemByType.get(t)!
+            return (
+              <View key={t} style={S.gridRow}>
+                <Text style={[S.gridCell, { flex: 1, textAlign: "left", textTransform: "capitalize" }]}>{t}</Text>
+                <Text style={[S.gridCell, { flex: 1 }]}>{v(c.batch_no)}</Text>
+                <Text style={[S.gridCell, { flex: 1 }]}>{v(c.manufacturer)}</Text>
+                <Text style={[S.gridCell, { flex: 1, borderRightWidth: 0 }]}>{v(c.expiry_date)}</Text>
               </View>
-              {rows.length > 0 && (
-                <View style={S.table}>
-                  <View style={S.tableHeader}>
-                    {DIM_COLS.map((c) => <Text key={c.key} style={[S.thCell, { width: c.width }]}>{c.label}</Text>)}
-                  </View>
-                  {rows.map((row, i) => (
-                    <View key={i} style={i % 2 === 0 ? S.tableRow : S.tableRowAlt}>
-                      {DIM_COLS.map((c) => (
-                        <Text key={c.key} style={[S.tdCell, { width: c.width }]}>{row[c.key as keyof DimensionRow] ?? ""}</Text>
-                      ))}
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
-          )
-        })}
+            )
+          })}
 
-        {/* Dispatch */}
-        {dispatches.length > 0 && (
-          <>
-            <Text style={S.sectionHead}>Dispatch</Text>
-            {dispatches.map((d) => (
-              <View key={d.id} style={S.grid2}>
-                <Field label="DC Number" value={d.dc_number} />
-                <Field label="Dispatch Date" value={fmtDate(d.dispatch_date)} />
-                <Field label="Vehicle Details" value={d.vehicle_details} />
-              </View>
+          {/* Machining */}
+          <SectionBar>Machining</SectionBar>
+          <Row3
+            a={<LV label="Machine Name" value={dim?.machine_name} />}
+            b={<LV label="Operator" value={dim?.operator} last />}
+            c={<></>}
+          />
+          <View style={S.gridHeader}>
+            {DRAWING_SIZE_GROUPS.map((g, gi) => (
+              <Text
+                key={g.group}
+                style={[S.gridHCell, gi === DRAWING_SIZE_GROUPS.length - 1 ? { flex: g.cols.length, borderRightWidth: 0 } : { flex: g.cols.length }]}
+              >
+                {g.group}
+              </Text>
             ))}
-          </>
-        )}
+          </View>
+          <View style={S.gridHeader}>
+            {DRAWING_SIZE_GROUPS.flatMap((g) => g.cols).map((c, i, arr) => (
+              <Text
+                key={`${c}-${i}`}
+                style={[S.gridHCell, { flex: 1 }, i === arr.length - 1 ? { borderRightWidth: 0 } : {}]}
+              >
+                {c}
+              </Text>
+            ))}
+          </View>
+          <View style={S.gridRow}>
+            {DRAWING_SIZE_GROUPS.flatMap((g) => g.cols).map((c, i, arr) => (
+              <Text
+                key={`${c}-${i}`}
+                style={[S.gridCell, { flex: 1 }, i === arr.length - 1 ? { borderRightWidth: 0 } : {}]}
+              >
+                {nextValue(c)}
+              </Text>
+            ))}
+          </View>
 
-        {/* Sign-off */}
-        <Text style={[S.sectionHead, { marginTop: 8 }]}>Approvals</Text>
-        <View style={S.sigRow}>
-          <View style={S.sigBox}>
-            <Text>{jobCard.production_checked_by ?? ""}</Text>
-            <Text>Production {jobCard.production_checked_date ? `(${fmtDate(jobCard.production_checked_date)})` : ""}</Text>
-          </View>
-          <View style={S.sigBox}>
-            <Text>{jobCard.qc_checked_by ?? ""}</Text>
-            <Text>Quality Control {jobCard.qc_checked_date ? `(${fmtDate(jobCard.qc_checked_date)})` : ""}</Text>
-          </View>
-          <View style={S.sigBox}>
-            <Text>{jobCard.stores_checked_by ?? ""}</Text>
-            <Text>Stores {jobCard.stores_checked_date ? `(${fmtDate(jobCard.stores_checked_date)})` : ""}</Text>
-          </View>
+          <Row3
+            a={<LV label="Weld Deposit Thickness" value={jobCard.weld_deposit_thickness_before} />}
+            b={<LV label="After M/C Weld Deposit thickness" value={jobCard.weld_deposit_thickness_after} last />}
+            c={<></>}
+          />
+          <Row3 a={<LV label="Punching Details" value={jobCard.punching_details} last />} b={<></>} c={<></>} />
+          <Row3
+            a={<LV label="Despatch DC No." value={dispatch?.dc_number ?? jobCard.despatch_dc_no} />}
+            b={<LV label="Date" value={fmtDate(dispatch?.dispatch_date ?? jobCard.despatch_date)} last />}
+            c={<></>}
+          />
+          <Row3 a={<LV label="Other Details" value={jobCard.other_details} last />} b={<></>} c={<></>} />
+
+          <Row3
+            a={<LV label="Production" value={jobCard.production_checked_by} />}
+            b={<LV label="Quality Control" value={jobCard.qc_checked_by} />}
+            c={<LV label="Stores" value={jobCard.stores_checked_by} last />}
+          />
+
+          <Text style={S.footer}>Ref: QAF 113, Rev/0</Text>
         </View>
-
-        <View style={[S.divider, { marginTop: 10 }]} />
-        <Text style={{ color: "#9ca3af", textAlign: "center", fontSize: 7 }}>
-          Raghav Engineering · Job Card · {jobCard.jc_number} · {fmtDate(jobCard.received_date)}
-        </Text>
-
       </Page>
     </Document>
   )

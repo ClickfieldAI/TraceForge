@@ -49,9 +49,9 @@ const S = StyleSheet.create({
   sectionTxt: { fontFamily: "Helvetica-Bold", fontSize: 8, padding: 3, textTransform: "uppercase" },
 
   gridHeader: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#111", backgroundColor: "#f0f0f0" },
-  gridHCell:  { borderRightWidth: 1, borderRightColor: "#111", padding: 2, fontFamily: "Helvetica-Bold", fontSize: 6.5, textAlign: "center" },
+  gridHCell:  { borderRightWidth: 1, borderRightColor: "#111", paddingVertical: 4, paddingHorizontal: 3, fontFamily: "Helvetica-Bold", fontSize: 7, textAlign: "center" },
   gridRow:    { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#111" },
-  gridCell:   { borderRightWidth: 1, borderRightColor: "#111", padding: 2, fontSize: 6.5, textAlign: "center" },
+  gridCell:   { borderRightWidth: 1, borderRightColor: "#111", paddingVertical: 4, paddingHorizontal: 3, fontSize: 7, textAlign: "center" },
 
   footer:    { textAlign: "center", fontSize: 7, fontFamily: "Helvetica-Bold", padding: 3 },
 })
@@ -104,14 +104,14 @@ const WELD_COLS = [
   { key: "qty",     label: "Actual Qty",           width: 52 },
   { key: "date",    label: "Weld Date",            width: 48 },
   { key: "preheat", label: "Pre Heat temp",        width: 52 },
-  { key: "inter",   label: "Inter-pass temp",      width: 56 },
+  { key: "inter",   label: "Inter-pass temp",      width: 52 },
   { key: "post",    label: "Post Heat temp",       width: 52 },
-  { key: "amp",     label: "Amp",                  width: 34 },
-  { key: "volt",    label: "Volt",                 width: 34 },
-  { key: "travel",  label: "Travel Speed",         width: 50 },
-  { key: "gas",     label: "Gas flow rate",        width: 54 },
-  { key: "feed",    label: "Consumable feed rate", width: 58 },
-  { key: "pol",     label: "Polarity",             width: 42 },
+  { key: "amp",     label: "Amp",                  width: 42 },
+  { key: "volt",    label: "Volt",                 width: 42 },
+  { key: "travel",  label: "Travel Speed",         width: 54 },
+  { key: "gas",     label: "Gas flow rate",        width: 50 },
+  { key: "feed",    label: "Consumable feed rate", width: 54 },
+  { key: "pol",     label: "Polarity",             width: 50 },
 ] as const
 
 type WeldTableRow = Record<(typeof WELD_COLS)[number]["key"], string>

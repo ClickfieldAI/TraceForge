@@ -143,7 +143,10 @@ function weldRows(executions: ExecRow[]): WeldTableRow[] {
   return [wpsRow, actualSummaryRow, ...dated]
 }
 
-const CHEM_ROW_TYPES = ["penetrant", "cleaner", "developer", "remover"] as const
+// Always printed, like the paper form's pre-printed row labels — filled in
+// when a matching chemical_type exists in the NDE record's data, blank
+// otherwise, never hidden for lack of data.
+const CHEM_ROW_TYPES = ["Penetrant", "Cleaner", "Developer"] as const
 
 // Two sub-groups of the paper form's "Drawing Size" table. Nothing in the
 // current dimension-entry UI captures values under these exact names yet
@@ -354,14 +357,14 @@ export function JobCardPdfTemplate({
             <Text style={[S.gridHCell, { flex: 1 }]}>Manufacturer&apos;s Name</Text>
             <Text style={[S.gridHCell, { flex: 1, borderRightWidth: 0 }]}>Expiry Date</Text>
           </View>
-          {CHEM_ROW_TYPES.filter((t) => chemByType.has(t)).map((t) => {
-            const c = chemByType.get(t)!
+          {CHEM_ROW_TYPES.map((t) => {
+            const c = chemByType.get(t.toLowerCase())
             return (
               <View key={t} style={S.gridRow}>
-                <Text style={[S.gridCell, { flex: 1, textAlign: "left", textTransform: "capitalize" }]}>{t}</Text>
-                <Text style={[S.gridCell, { flex: 1 }]}>{v(c.batch_no)}</Text>
-                <Text style={[S.gridCell, { flex: 1 }]}>{v(c.manufacturer)}</Text>
-                <Text style={[S.gridCell, { flex: 1, borderRightWidth: 0 }]}>{v(c.expiry_date)}</Text>
+                <Text style={[S.gridCell, { flex: 1, textAlign: "left" }]}>{t}</Text>
+                <Text style={[S.gridCell, { flex: 1 }]}>{v(c?.batch_no)}</Text>
+                <Text style={[S.gridCell, { flex: 1 }]}>{v(c?.manufacturer)}</Text>
+                <Text style={[S.gridCell, { flex: 1, borderRightWidth: 0 }]}>{v(c?.expiry_date)}</Text>
               </View>
             )
           })}
